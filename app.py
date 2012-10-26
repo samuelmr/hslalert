@@ -5,8 +5,7 @@ from urllib import urlopen
 import time
 import os
 
-lang='fi';
-poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v2/' + lang
+poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v2/'
 
 gtfs_version = '20120224'
 agency_id = 'HSL'
@@ -35,15 +34,21 @@ tree = et.ElementTree()
 app = Flask(__name__)
 
 @app.route('/')
-
 def index():
-  tree.parse(urlopen(poikkeusURL))
+  return getDisruptions()
+
+@app.route('/<lang>')
+def with_lang(lang):
+  return getDisruptions(lang)
+
+def getDisruptions(lang='fi'):
+  tree.parse(urlopen(poikkeusURL + lang))
   msg = gtfs_realtime_pb2.FeedMessage()
   msg.header.gtfs_realtime_version = "1.0"
   msg.header.incrementality = msg.header.FULL_DATASET
   disruptions = tree.getroot()
   # et.dump(disruptions)
-  if (disruptions):
+  if (disruptions is not None):
     dtime = time.strptime(disruptions.attrib['time'], '%Y-%m-%dT%H:%M:%S')
     msg.header.timestamp = int(time.mktime(dtime))
 
@@ -80,10 +85,10 @@ def index():
           trans.language = t.attrib['lang']
           trans.text = t.text
 
-  # print(msg);
   return msg.SerializeToString()
 
 if __name__ == '__main__':
   port = int(os.environ.get('PORT', 5000))
+  app.debug = True
   app.run(host='0.0.0.0', port=port)
 

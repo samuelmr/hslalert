@@ -1,12 +1,11 @@
-#!/usr/bin/python
-
 import gtfs_realtime_pb2
+from flask import Flask
 from xml.etree import ElementTree
 from urllib import urlopen
 import time
+import os
 
-lang='fi';
-poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v2/' + lang
+poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v2/'
 
 gtfs_version = '20120224'
 agency_id = 'HSL'
@@ -32,15 +31,28 @@ yd = weekdays[lt[6]]
 et = ElementTree
 tree = et.ElementTree()
 
-def index(req):
-  tree.parse(urlopen(poikkeusURL))
-  # tree.parse(open('poikkeus.xml'))
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+  return getDisruptions()
+
+@app.route('/<lang>')
+def with_lang(lang):
+  return getDisruptions(lang)
+
+@app.route('/<lang>/<format>')
+def with_lang_and_format(lang, format):
+  return getDisruptions(lang, format)
+
+def getDisruptions(lang='fi', format='binary'):
+  tree.parse(urlopen(poikkeusURL + lang))
   msg = gtfs_realtime_pb2.FeedMessage()
   msg.header.gtfs_realtime_version = "1.0"
   msg.header.incrementality = msg.header.FULL_DATASET
   disruptions = tree.getroot()
   # et.dump(disruptions)
-  if (disruptions):
+  if (disruptions is not None):
     dtime = time.strptime(disruptions.attrib['time'], '%Y-%m-%dT%H:%M:%S')
     msg.header.timestamp = int(time.mktime(dtime))
 
@@ -77,7 +89,14 @@ def index(req):
           trans.language = t.attrib['lang']
           trans.text = t.text
 
-  # print(msg);
-  return msg.SerializeToString()
+  if (format == 'binary'):
+    return msg.SerializeToString()
+  else:
+    return msg
 
-print index(1)
+
+if __name__ == '__main__':
+  port = int(os.environ.get('PORT', 5000))
+  app.debug = True
+  app.run(host='0.0.0.0', port=port)
+
