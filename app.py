@@ -43,6 +43,7 @@ def with_lang(lang):
 
 def getDisruptions(lang='fi'):
   tree.parse(urlopen(poikkeusURL + lang))
+  # tree.parse(open('.trash/poikkeus.xml'))
   msg = gtfs_realtime_pb2.FeedMessage()
   msg.header.gtfs_realtime_version = "1.0"
   msg.header.incrementality = msg.header.FULL_DATASET
@@ -81,10 +82,11 @@ def getDisruptions(lang='fi'):
         texts = list(a.find('INFO'))
         # print texts
         for t in texts:
-          trans = ent.alert.header_text.translation.add()
-          trans.language = t.attrib['lang']
-          trans.text = t.text
+          head = ent.alert.header_text.translation.add()
+          head.language = t.attrib['lang']
+          head.text = t.text
 
+  # print msg
   return msg.SerializeToString()
 
 if __name__ == '__main__':
