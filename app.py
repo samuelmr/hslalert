@@ -33,15 +33,12 @@ tree = et.ElementTree()
 
 app = Flask(__name__)
 
-@app.route('/')
-def index():
-  return getDisruptions()
-
+@app.route('/', defaults={'lang': 'fi'})
 @app.route('/<lang>')
-def with_lang(lang):
+def index(lang):
   return getDisruptions(lang)
 
-def getDisruptions(lang='fi'):
+def getDisruptions(lang):
   tree.parse(urlopen(poikkeusURL + lang))
   # tree.parse(open('.trash/poikkeus.xml'))
   msg = gtfs_realtime_pb2.FeedMessage()
