@@ -15,61 +15,63 @@ tree = ElementTree()
 
 app = Flask(__name__)
 
+
 @app.route('/')
 def index():
-  return getDisruptions()
+    return getDisruptions()
+
 
 def getDisruptions():
-  """Get alerts from HSL XML interface and format them into GTFS-RT"""
-  tree.parse(urlopen(poikkeusURL))
-  msg = gtfs_realtime_pb2.FeedMessage()
-  msg.header.gtfs_realtime_version = "1.0"
-  msg.header.incrementality = msg.header.FULL_DATASET
-  disruptions = tree.getroot()
-  if (disruptions is not None):
-    msg.header.timestamp = int(time.mktime(
-        iso8601.parse_date(disruptions.attrib['time']).timetuple()))
+    """Get alerts from HSL XML interface and format them into GTFS-RT"""
+    tree.parse(urlopen(poikkeusURL))
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.header.gtfs_realtime_version = "1.0"
+    msg.header.incrementality = msg.header.FULL_DATASET
+    disruptions = tree.getroot()
+    if (disruptions is not None):
+        msg.header.timestamp = int(time.mktime(
+            iso8601.parse_date(disruptions.attrib['time']).timetuple()))
 
-    for disruption in list(disruptions):
-      if (disruption.tag == 'DISRUPTION'):
-        entity = msg.entity.add()
-        entity.id = disruption.attrib['id']
-        entity.alert.effect = int(disruption.attrib['effect'])
+        for disruption in list(disruptions):
+            if (disruption.tag == 'DISRUPTION'):
+                entity = msg.entity.add()
+                entity.id = disruption.attrib['id']
+                entity.alert.effect = int(disruption.attrib['effect'])
 
-        for line in list(disruption.find('TARGETS')):
-          inf = entity.alert.informed_entity.add()
-          inf.agency_id = agency_id
-          if 'route_type' in line.attrib:
-            inf.route_type = int(line.attrib['route_type'])
-          if 'id' in line.attrib:
-            inf.route_id = line.attrib['id']
-          if 'deptime' in line.attrib:
-            if 'id' in line.attrib:
-              inf.trip.route_id = line.attrib['id']
-            start_time = iso8601.parse(line.attrib['deptime'])
-            inf.trip.start_date = start_time.strftime("%Y%m%d")
-            inf.trip.start_time = start_time.strftime("%H:%M:%S")
+                for line in list(disruption.find('TARGETS')):
+                    inf = entity.alert.informed_entity.add()
+                    inf.agency_id = agency_id
+                    if 'route_type' in line.attrib:
+                        inf.route_type = int(line.attrib['route_type'])
+                    if 'id' in line.attrib:
+                        inf.route_id = line.attrib['id']
+                    if 'deptime' in line.attrib:
+                        if 'id' in line.attrib:
+                            inf.trip.route_id = line.attrib['id']
+                        start_time = iso8601.parse(line.attrib['deptime'])
+                        inf.trip.start_date = start_time.strftime("%Y%m%d")
+                        inf.trip.start_time = start_time.strftime("%H:%M:%S")
 
-        v = disruption.find('VALIDITY')
-        entity.is_deleted = (v.attrib['status'] == 0)
-        vper = entity.alert.active_period.add()
-        vper.start = int(time.mktime(
-            iso8601.parse_date(v.attrib['from']).timetuple()))
-        vper.end = int(time.mktime(
-            iso8601.parse_date(v.attrib['to']).timetuple()))
+                v = disruption.find('VALIDITY')
+                entity.is_deleted = (v.attrib['status'] == 0)
+                vper = entity.alert.active_period.add()
+                vper.start = int(time.mktime(
+                    iso8601.parse_date(v.attrib['from']).timetuple()))
+                vper.end = int(time.mktime(
+                    iso8601.parse_date(v.attrib['to']).timetuple()))
 
-        texts = list(disruption.find('INFO'))
-        for t in texts:
-          head = entity.alert.header_text.translation.add()
-          head.language = t.attrib['lang']
-          head.text = t.text
+                texts = list(disruption.find('INFO'))
+                for t in texts:
+                    head = entity.alert.header_text.translation.add()
+                    head.language = t.attrib['lang']
+                    head.text = t.text
 
-  return msg.SerializeToString()
+    return msg.SerializeToString()
 
 def main(debug=True):
-  port = int(os.environ.get('PORT', 5000))
-  app.debug = debug
-  app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 5000))
+    app.debug = debug
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     main()
