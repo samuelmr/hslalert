@@ -2,8 +2,10 @@ import os
 import time
 from urllib import urlopen
 from xml.etree.ElementTree import ElementTree
+from google.protobuf import text_format
 
 from flask import Flask
+from flask import request
 import iso8601
 
 import gtfs_realtime_pb2
@@ -67,7 +69,11 @@ def getDisruptions():
                     head.language = t.attrib['lang']
                     head.text = t.text
 
-    return msg.SerializeToString()
+    if 'debug' in request.args:
+        return text_format.MessageToString(msg)
+    else:
+        return msg.SerializeToString()
+
 
 def main(debug=True):
     port = int(os.environ.get('PORT', 5000))
