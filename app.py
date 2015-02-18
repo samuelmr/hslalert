@@ -45,9 +45,10 @@ def getDisruptions():
                         inf.route_type = int(line.attrib['route_type'])
                     if 'id' in line.attrib:
                         inf.route_id = line.attrib['id']
+                        inf.trip.route_id = line.attrib['id']
+                        if 'direction' in line.attrib:
+                            inf.trip.direction_id = int(line.attrib['direction'])-1
                     if 'deptime' in line.attrib:
-                        if 'id' in line.attrib:
-                            inf.trip.route_id = line.attrib['id']
                         start_time = iso8601.parse(line.attrib['deptime'])
                         inf.trip.start_date = start_time.strftime("%Y%m%d")
                         inf.trip.start_time = start_time.strftime("%H:%M:%S")
