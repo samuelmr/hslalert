@@ -65,7 +65,7 @@ def getDisruptions():
 
                 texts = list(disruption.find('INFO'))
                 for t in texts:
-                    head = entity.alert.header_text.translation.add()
+                    head = entity.alert.description_text.translation.add()
                     head.language = t.attrib['lang']
                     head.text = t.text
 
