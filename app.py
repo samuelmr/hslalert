@@ -65,9 +65,10 @@ def getDisruptions():
 
                 texts = list(disruption.find('INFO'))
                 for t in texts:
-                    head = entity.alert.description_text.translation.add()
-                    head.language = t.attrib['lang']
-                    head.text = t.text
+                    if t.text and t.attrib['lang']:
+                        head = entity.alert.description_text.translation.add()
+                        head.language = t.attrib['lang']
+                        head.text = t.text
 
     if 'debug' in request.args:
         return text_format.MessageToString(msg)
