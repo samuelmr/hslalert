@@ -2,8 +2,10 @@ import os
 import time
 from urllib import urlopen
 from xml.etree.ElementTree import ElementTree
+from google.protobuf import text_format
 
 from flask import Flask
+from flask import request
 import iso8601
 
 import gtfs_realtime_pb2
@@ -45,10 +47,11 @@ def getDisruptions():
                         inf.route_type = int(line.attrib['route_type'])
                     if 'id' in line.attrib:
                         inf.route_id = line.attrib['id']
+                        inf.trip.route_id = line.attrib['id']
+                        if 'direction' in line.attrib:
+                            inf.trip.direction_id = int(line.attrib['direction'])-1
                     if 'deptime' in line.attrib:
-                        if 'id' in line.attrib:
-                            inf.trip.route_id = line.attrib['id']
-                        start_time = iso8601.parse(line.attrib['deptime'])
+                        start_time = iso8601.parse_date(line.attrib['deptime'])
                         inf.trip.start_date = start_time.strftime("%Y%m%d")
                         inf.trip.start_time = start_time.strftime("%H:%M:%S")
 
@@ -62,13 +65,18 @@ def getDisruptions():
 
                 texts = list(disruption.find('INFO'))
                 for t in texts:
-                    head = entity.alert.header_text.translation.add()
-                    head.language = t.attrib['lang']
-                    head.text = t.text
+                    if t.text and t.attrib['lang']:
+                        head = entity.alert.description_text.translation.add()
+                        head.language = t.attrib['lang']
+                        head.text = t.text
 
-    return msg.SerializeToString()
+    if 'debug' in request.args:
+        return text_format.MessageToString(msg)
+    else:
+        return msg.SerializeToString()
 
-def main(debug=True):
+
+def main(debug=False):
     port = int(os.environ.get('PORT', 5000))
     app.debug = debug
     app.run(host='0.0.0.0', port=port)
