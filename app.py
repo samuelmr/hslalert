@@ -1,93 +1,77 @@
-import gtfs_realtime_pb2
-from flask import Flask
-from xml.etree import ElementTree
-from urllib import urlopen
-import time
 import os
+import time
+from urllib import urlopen
+from xml.etree.ElementTree import ElementTree
 
-poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v2/'
+from flask import Flask
+import iso8601
 
-gtfs_version = '20120224'
+import gtfs_realtime_pb2
+
+poikkeusURL = 'http://www.poikkeusinfo.fi/xml/v3'
 agency_id = 'HSL'
 
-linetypes = {}
-linetypes['1'] = 3 # Helsingin sisainen
-linetypes['2'] = 0 # raitiovaunut
-linetypes['3'] = 3 # Espoon sisainen
-linetypes['4'] = 3 # Vantaan sisainen
-linetypes['5'] = 3 # seutuliikenne
-linetypes['6'] = 1 # metro
-linetypes['7'] = 4 # lautta
-linetypes['12'] = 2 # lahiliikennejunat
-linetypes['36'] = 3 # Kirkkonummen sisainen
-linetypes['39'] = 3 # Keravan sisainen
-
-weekdays = ['Su', 'Ma', 'Ti', 'Ke', 'To', 'Pe', 'La', 'Su']
-weekdays[-1] = 'Su';
-lt = time.localtime()
-wd = weekdays[lt[6]+1]
-yd = weekdays[lt[6]]
-
-et = ElementTree
-tree = et.ElementTree()
+tree = ElementTree()
 
 app = Flask(__name__)
 
-@app.route('/', defaults={'lang': 'fi'})
-@app.route('/<lang>')
-def index(lang):
-  return getDisruptions(lang)
 
-def getDisruptions(lang):
-  tree.parse(urlopen(poikkeusURL + lang))
-  # tree.parse(open('.trash/poikkeus.xml'))
-  msg = gtfs_realtime_pb2.FeedMessage()
-  msg.header.gtfs_realtime_version = "1.0"
-  msg.header.incrementality = msg.header.FULL_DATASET
-  disruptions = tree.getroot()
-  # et.dump(disruptions)
-  if (disruptions is not None):
-    dtime = time.strptime(disruptions.attrib['time'], '%Y-%m-%dT%H:%M:%S')
-    msg.header.timestamp = int(time.mktime(dtime))
+@app.route('/')
+def index():
+    return getDisruptions()
 
-    alerts = list(disruptions)
-    cnt = 0;
-    for a in alerts:
-      if (a.tag == 'DISRUPTION'):
-        # print a
-        cnt += 1
-        ent = msg.entity.add()
-        ent.id = a.attrib['id']
-        inf = ent.alert.informed_entity.add()
-        inf.agency_id = agency_id
-        targets = list(a.find('TARGETS'))
-        for t in targets:
-          if (t.tag == 'LINETYPE'):
-            inf.route_type = linetypes[t.attrib['id']]
-          elif (t.tag == 'LINE'):
-            inf.route_id = t.attrib['id']
-            inf.route_type = linetypes[t.attrib['linetype']]
-        v = a.find('VALIDITY')
-        ent.is_deleted = (v.attrib['status'] == 0)
-        ftime = time.strptime(v.attrib['from'], '%Y-%m-%dT%H:%M:%S')
-        ttime = time.strptime(v.attrib['to'], '%Y-%m-%dT%H:%M:%S')
-        vper = ent.alert.active_period.add()
-        vper.start = int(time.mktime(ftime))
-        vper.end = int(time.mktime(ttime))
-  
-        # print 
-        texts = list(a.find('INFO'))
-        # print texts
-        for t in texts:
-          head = ent.alert.header_text.translation.add()
-          head.language = t.attrib['lang']
-          head.text = t.text
 
-  # print msg
-  return msg.SerializeToString()
+def getDisruptions():
+    """Get alerts from HSL XML interface and format them into GTFS-RT"""
+    tree.parse(urlopen(poikkeusURL))
+    msg = gtfs_realtime_pb2.FeedMessage()
+    msg.header.gtfs_realtime_version = "1.0"
+    msg.header.incrementality = msg.header.FULL_DATASET
+    disruptions = tree.getroot()
+    if (disruptions is not None):
+        msg.header.timestamp = int(time.mktime(
+            iso8601.parse_date(disruptions.attrib['time']).timetuple()))
+
+        for disruption in list(disruptions):
+            if (disruption.tag == 'DISRUPTION'):
+                entity = msg.entity.add()
+                entity.id = disruption.attrib['id']
+                entity.alert.effect = int(disruption.attrib['effect'])
+
+                for line in list(disruption.find('TARGETS')):
+                    inf = entity.alert.informed_entity.add()
+                    inf.agency_id = agency_id
+                    if 'route_type' in line.attrib:
+                        inf.route_type = int(line.attrib['route_type'])
+                    if 'id' in line.attrib:
+                        inf.route_id = line.attrib['id']
+                    if 'deptime' in line.attrib:
+                        if 'id' in line.attrib:
+                            inf.trip.route_id = line.attrib['id']
+                        start_time = iso8601.parse(line.attrib['deptime'])
+                        inf.trip.start_date = start_time.strftime("%Y%m%d")
+                        inf.trip.start_time = start_time.strftime("%H:%M:%S")
+
+                v = disruption.find('VALIDITY')
+                entity.is_deleted = (v.attrib['status'] == 0)
+                vper = entity.alert.active_period.add()
+                vper.start = int(time.mktime(
+                    iso8601.parse_date(v.attrib['from']).timetuple()))
+                vper.end = int(time.mktime(
+                    iso8601.parse_date(v.attrib['to']).timetuple()))
+
+                texts = list(disruption.find('INFO'))
+                for t in texts:
+                    head = entity.alert.header_text.translation.add()
+                    head.language = t.attrib['lang']
+                    head.text = t.text
+
+    return msg.SerializeToString()
+
+def main(debug=True):
+    port = int(os.environ.get('PORT', 5000))
+    app.debug = debug
+    app.run(host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
-  port = int(os.environ.get('PORT', 5000))
-  # app.debug = True
-  app.run(host='0.0.0.0', port=port)
-
+    main()
