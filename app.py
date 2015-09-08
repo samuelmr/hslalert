@@ -7,6 +7,7 @@ from google.protobuf import text_format
 from flask import Flask
 from flask import request
 import iso8601
+from calendar import timegm
 
 import gtfs_realtime_pb2
 
@@ -31,8 +32,8 @@ def getDisruptions():
     msg.header.incrementality = msg.header.FULL_DATASET
     disruptions = tree.getroot()
     if (disruptions is not None):
-        msg.header.timestamp = int(time.mktime(
-            iso8601.parse_date(disruptions.attrib['time']).timetuple()))
+        msg.header.timestamp = int(timegm(
+            iso8601.parse_date(disruptions.attrib['time']).utctimetuple()))
 
         for disruption in list(disruptions):
             if (disruption.tag == 'DISRUPTION'):
@@ -58,10 +59,10 @@ def getDisruptions():
                 v = disruption.find('VALIDITY')
                 entity.is_deleted = (v.attrib['status'] == 0)
                 vper = entity.alert.active_period.add()
-                vper.start = int(time.mktime(
-                    iso8601.parse_date(v.attrib['from']).timetuple()))
-                vper.end = int(time.mktime(
-                    iso8601.parse_date(v.attrib['to']).timetuple()))
+                vper.start = int(timegm(
+                    iso8601.parse_date(v.attrib['from']).utctimetuple()))
+                vper.end = int(timegm(
+                    iso8601.parse_date(v.attrib['to']).utctimetuple()))
 
                 texts = list(disruption.find('INFO'))
                 for t in texts:
