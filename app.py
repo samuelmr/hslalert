@@ -44,14 +44,14 @@ def getDisruptions():
                 for line in list(disruption.find('TARGETS')):
                     inf = entity.alert.informed_entity.add()
                     inf.agency_id = agency_id
-                    if 'route_type' in line.attrib:
+                    if 'route_type' in line.attrib and line.attrib['route_type']:
                         inf.route_type = int(line.attrib['route_type'])
-                    if 'id' in line.attrib:
+                    if 'id' in line.attrib and line.attrib['id']:
                         inf.route_id = line.attrib['id']
                         inf.trip.route_id = line.attrib['id']
-                        if 'direction' in line.attrib:
+                        if 'direction' in line.attrib and line.attrib['direction']:
                             inf.trip.direction_id = int(line.attrib['direction'])-1
-                    if 'deptime' in line.attrib:
+                    if 'deptime' in line.attrib and line.attrib['deptime']:
                         start_time = iso8601.parse_date(line.attrib['deptime'])
                         inf.trip.start_date = start_time.strftime("%Y%m%d")
                         inf.trip.start_time = start_time.strftime("%H:%M:%S")
